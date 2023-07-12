@@ -1,6 +1,7 @@
 using Amazon;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
+using Amazon.Lambda.SNSEvents;
 using Amazon.Lambda.SQSEvents;
 using Amazon.Runtime;
 using Amazon.SimpleNotificationService;
@@ -19,6 +20,8 @@ public class Function
     private const string QUEUE_URL = "https://sqs.eu-north-1.amazonaws.com/530375214676/aws-task9-uploads-notification-queue";
     private const string TOPIC_ARN = "arn:aws:sns:eu-north-1:530375214676:aws-task9-uploads-notification-topic";
     private const int MAX_NUMBER_OF_MESSAGES = 10;
+    private static readonly string API = "API";
+    private static readonly string DETAIL_TYPE_PARAM = "detail-type";
 
     private readonly IAmazonSimpleNotificationService _snsClient;
     private readonly IAmazonSQS _sqsClient;
@@ -37,9 +40,15 @@ public class Function
     /// <param name="evnt"></param>
     /// <param name="context"></param>
     /// <returns></returns>
-    public async Task<APIGatewayProxyResponse> FunctionHandler(SQSEvent evnt, ILambdaContext context)
+    public async Task<APIGatewayProxyResponse> FunctionHandler(IDictionary<string, object> input, SQSEvent evnt, ILambdaContext context)
     {
         _logger = context.Logger;
+        //_logger.LogLine($"Event Detail Type: " +
+        //    $"{evnt?.Records?[0]?.Sns?.MessageAttributes?.TryGetValue("detail-type", out var detailType) == true ?
+        //    detailType.Value : "unknown"}");
+
+        object detail = input.ContainsKey(DETAIL_TYPE_PARAM) ? input[DETAIL_TYPE_PARAM] : null;
+        string detailType = detail == null ? API : Convert.ToString(detail);
 
         var messages = await ReadMessages();
         if (messages.Count > 0)
@@ -50,6 +59,7 @@ public class Function
 
         _logger.LogLine($"" +
             $"Handled Request for ARN = {TOPIC_ARN}; " +
+            $"Request Source = {detailType}; " +
             $"Function Name = {context.FunctionName}; " +
             $"Processed Messages count = {messages.Count}; " +
             $"Remaining Time in millis = {context.RemainingTime}");
